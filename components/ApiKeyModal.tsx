@@ -111,9 +111,7 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
           API 키 설정
         </h3>
 
-        <p className="text-sm text-yellow-700 dark:text-yellow-300 mb-4">
-          ⚠️ 이 애플리케이션은 Google의 `@google/genai` 코딩 가이드라인과 다르게 API 키를 직접 입력받아 `localStorage`에 저장합니다. 프로덕션 환경에서는 `process.env.API_KEY`를 사용하는 것이 권장됩니다.
-        </p>
+        {/* ⚠️ Removed the warning message here ⚠️ */}
 
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4 dark:bg-red-950 dark:border-red-700 dark:text-red-300" role="alert">
