@@ -1,0 +1,5 @@
+{
+  "name": "AI 이미지 프롬프트 및 생성기",
+  "description": "Gemini를 사용하여 창의적인 이미지 프롬프트를 생성하고, Kie.ai 및 Google Gemini/Imagen API를 사용하여 실제 이미지를 생성하며, 다양한 이미지 생성 모델을 선택할 수 있는 React 애플리케이션입니다.",
+  "requestFramePermissions": []
+}
