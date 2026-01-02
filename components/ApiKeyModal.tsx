@@ -184,7 +184,7 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
             />
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-[-10px]">
               Kie.ai 기반 모델(4o Image, Flux Kontext, Seedream, Midjourney 등)을 사용할 때 필요합니다.
-              (<a href="https://kie.ai/api-key" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Kie.ai API 키 발급</a>)
+              (<a href="https://kie.ai?ref=a15da29b2cf4f351c2dd25bb11367986" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">Kie.ai API 키 발급</a>)
             </p>
             <div className="flex items-center space-x-2 mt-2">
               <Button
