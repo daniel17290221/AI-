@@ -1,4 +1,5 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
+import { ReferenceImage } from '../types'; // Import ReferenceImage
 
 interface SubtitleInput {
   text: string;
@@ -30,7 +31,7 @@ interface StructuredPromptInput {
   backstory: string;
   cameraGear: string[];
   imageQuality: string; // New: selected image quality
-  hasCharacterReferenceImage?: boolean;
+  characterReferenceImages?: ReferenceImage[]; // CHANGED: Now an array of ReferenceImage
   subtitles?: SubtitleInput[]; // New: array of subtitles with emphasis flag
 }
 
@@ -80,15 +81,15 @@ export const generateImagePrompt = async (
         backstory,
         cameraGear,
         imageQuality, // New
-        hasCharacterReferenceImage,
+        characterReferenceImages, // CHANGED
         subtitles, // New
       } = input;
 
       let structuredPromptParts = [];
 
-      // Add instruction for reference image if present
-      if (hasCharacterReferenceImage) {
-        structuredPromptParts.push(`**제공된 인물 이미지를 강력하게 참조하여 생성해주세요.**`);
+      // Add instruction for reference image(s) if present
+      if (characterReferenceImages && characterReferenceImages.length > 0) {
+        structuredPromptParts.push(`**제공된 ${characterReferenceImages.length > 1 ? '여러' : ''} 인물 이미지를 강력하게 참조하여 생성해주세요.**`);
       }
 
       // Main topic (if provided by user)

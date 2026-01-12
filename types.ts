@@ -5,6 +5,13 @@ export interface KieAiImageModel {
   description: string;
 }
 
+export interface ReferenceImage {
+  id: string; // For React list keys
+  data: string;
+  mimeType: string;
+  fileName: string;
+}
+
 export interface KieAiImageGenerationResponse {
   imageUrl: string; // Base64 encoded image or URL
   model: string;

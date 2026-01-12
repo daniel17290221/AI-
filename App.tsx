@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { generateImagePrompt } from './services/geminiService';
 import { KieAiService, mapToQwenImageSize, mapToGrokImagineAspectRatio, getKieAiDirectDownloadUrl } from './services/kieAiService'; // Import getKieAiDirectDownloadUrl
-import { KieAiImageGenerationResponse, KieAiImageModel } from './types';
+import { KieAiImageGenerationResponse, KieAiImageModel, ReferenceImage } from './types'; // Import ReferenceImage
 import Button from './components/Button';
 import Dropdown from './components/Dropdown';
 import LoadingSpinner from './components/LoadingSpinner';
@@ -227,8 +227,7 @@ const App: React.FC = () => {
   const [personalityTraits, setPersonalityTraits] = useState<string>('');
   const [backstory, setBackstory] = useState<string>('');
   const [cameraGear, setCameraGear] = useState<string[]>(['선택 안함']);
-  const [characterReferenceImage, setCharacterReferenceImage] = useState<{ data: string; mimeType: string; } | null>(null);
-  const [characterReferenceImageFileName, setCharacterReferenceImageFileName] = useState<string | null>(null);
+  const [characterReferenceImages, setCharacterReferenceImages] = useState<ReferenceImage[]>([]); // CHANGED: now array of ReferenceImage
 
   // Generation Control States
   const [mainTopic, setMainTopic] = useState<string>(''); // New: AI 이미지 생성 주제목
@@ -474,9 +473,8 @@ const App: React.FC = () => {
     [],
   );
 
-  const handleCharacterReferenceChange = useCallback((image: { data: string; mimeType: string; } | null, fileName: string | null) => {
-    setCharacterReferenceImage(image);
-    setCharacterReferenceImageFileName(fileName);
+  const handleCharacterReferenceChange = useCallback((images: ReferenceImage[]) => { // CHANGED: now array
+    setCharacterReferenceImages(images);
   }, []);
 
   const handleGeneratePrompt = useCallback(async () => {
@@ -501,7 +499,7 @@ const App: React.FC = () => {
       mainTopic.trim().length > 0 || // New: mainTopic
       subtitles.some(s => s.text.trim().length > 0); // New: subtitles
 
-    if (!isAnyFieldPopulated && !characterReferenceImage) {
+    if (!isAnyFieldPopulated && characterReferenceImages.length === 0) { // CHANGED: check array length
       setError('프롬프트 생성을 위해 최소한 하나의 아이디어를 입력하거나 레퍼런스 이미지를 제공해주세요.');
       return;
     }
@@ -528,7 +526,7 @@ const App: React.FC = () => {
           backstory, // New
           cameraGear, // New
           filter, // New
-          hasCharacterReferenceImage: !!characterReferenceImage, // Pass reference image presence
+          characterReferenceImages, // CHANGED: pass array
           imageQuality, // Pass selected image quality
           subtitles, // Pass subtitles
         },
@@ -563,7 +561,7 @@ const App: React.FC = () => {
     bodyType, // removed old 'clothing' and 'accessories'
     personalityTraits, backstory, // New dependencies
     cameraGear, filter, // New dependencies
-    characterReferenceImage, // Added as a dependency to check its presence
+    characterReferenceImages, // CHANGED: Added as a dependency to check its presence
     geminiApiKey, // RE-ADDED: Added geminiApiKey dependency
   ]);
 
@@ -591,18 +589,31 @@ const App: React.FC = () => {
 
 
     let modelToUse = selectedImageModel;
-    // UPDATED: allowedGoogleI2IModels now only for Google models, Kie.ai I2I models are handled by kieAiApiKey check
-    const allowedGoogleI2IModels = ['kie-gemini-flash-image', 'kie-gemini-pro-image', 'kie-imagen-4'];
+    // UPDATED: allowedI2IModels now includes all Kie.ai models that support reference images or I2I.
+    const allowedI2IModels = ['kie-gemini-flash-image', 'kie-gemini-pro-image', 'kie-imagen-4', 'kie-4o-image', 'kie-flux-2-pro'];
 
-    if (characterReferenceImage) {
-      // Check if the selected model (from main dropdown) supports reference images
-      if (!allowedGoogleI2IModels.includes(selectedImageModel) && !isKieAi4oImageModel(selectedImageModel) && !isKieAiFlux2ProModel(selectedImageModel)) {
-        setError('인물 및 이미지 레퍼런스 기능은 \'나노바나나\', \'나노바나나 프로\', \'Imagen 4.0\', \'4o Image API\', \'Flux-2 Pro\' 모델에서 지원됩니다. 이 중 하나를 선택해주세요.');
+    if (characterReferenceImages.length > 0) {
+      // Check if the selected model supports *any* form of reference images.
+      if (!allowedI2IModels.includes(selectedImageModel)) {
+        setError(`선택하신 모델 ('${availableImageModels.find(m => m.id === selectedImageModel)?.name || selectedImageModel}')은 인물 및 이미지 레퍼런스 기능을 지원하지 않습니다. 이 기능은 '나노바나나', '나노바나나 프로', 'Imagen 4.0', '4o Image API', 'Flux-2 Pro' 모델에서 지원됩니다. 이 중 하나를 선택하거나, 참조 이미지를 제거해주세요.`);
         return; // Stop generation if unsupported model
-      } else if (selectedImageModel === 'kie-gemini-flash-image') {
-        // Only a suggestion, not an error or forced switch
-        alert('ℹ️ 인물 및 이미지 레퍼런스 기능은 \'나노바나나 프로\' 모델에서 가장 만족스러운 결과를 제공합니다. 현재 선택된 모델로 계속 진행합니다.');
       }
+
+      // Specific validation/alerts for models with particular reference image limitations
+      if (selectedImageModel === 'kie-imagen-4' && characterReferenceImages.length > 1) {
+        alert('ℹ️ Imagen 4.0 모델은 단일 참조 이미지만 지원합니다. 첫 번째 이미지로만 진행합니다.');
+      } else if (selectedImageModel === 'kie-gemini-flash-image') {
+        alert('ℹ️ \'나노바나나 프로\' 모델은 인물 및 이미지 레퍼런스 기능을 사용할 때 가장 만족스러운 결과를 제공합니다. 현재 선택된 \'나노바나나\' 모델로 계속 진행합니다.');
+      }
+      
+      // General Google-backed models (Gemini, Imagen) can handle up to 3 for our purposes
+      if (isGoogleBackedModel(modelToUse) && characterReferenceImages.length > 3) {
+        setError("Google 기반 모델 (나노바나나, 나노바나나 프로, Imagen 4.0)은 최대 3개의 참조 이미지만 지원합니다. 초과된 이미지를 제거해주세요.");
+        return;
+      }
+      // Kie.ai 4o Image and Flux-2 Pro handle multiple reference images via URL upload, up to their API's internal limit (which we assume is 3 for this request).
+      // No specific length validation needed here for 4o Image or Flux-2 Pro beyond the general limit, as their APIs handle array inputs.
+
       modelToUse = selectedImageModel; // Use the selected model if it's in the allowed list
     }
     
@@ -619,9 +630,9 @@ const App: React.FC = () => {
       return;
     }
 
-    // Validate characterReferenceImage for Text-to-Image only models
+    // Validate characterReferenceImages for Text-to-Image only models
     // Qwen is now T2I ONLY, so it should be included here.
-    if ((isKieAiSeedream4Model(modelToUse) || isKieAiMidjourneyModel(modelToUse) || isKieAiZImageModel(modelToUse) || isKieAiGrokImagineModel(modelToUse) || isKieAiQwenModel(modelToUse)) && characterReferenceImage) { // Check for reference image
+    if ((isKieAiSeedream4Model(modelToUse) || isKieAiMidjourneyModel(modelToUse) || isKieAiZImageModel(modelToUse) || isKieAiGrokImagineModel(modelToUse) || isKieAiQwenModel(modelToUse)) && characterReferenceImages.length > 0) { // CHANGED: check array length
       setError(`'${availableImageModels.find(m => m.id === modelToUse)?.name}'은 텍스트-투-이미지만 지원합니다. 레퍼런스 이미지를 제거해주세요.`);
       return;
     }
@@ -639,12 +650,11 @@ const App: React.FC = () => {
         512, // width is placeholder, actual dimensions handled by aspect ratio config
         512, // height is placeholder
         selectedAspectRatio,
-        characterReferenceImage, // Pass the character reference image for new generation
+        characterReferenceImages, // CHANGED: Pass array of images for new generation
         null, // No image to edit for initial generation
         imageQuality, // Pass image quality
         geminiApiKey, // RE-ADDED: Pass Gemini API key for Google models
         kieAiApiKey, // RE-ADDED: Pass Kie.ai API key for Kie.ai 4o Image model
-        characterReferenceImageFileName, // Pass the filename for characterReferenceImage
       );
       setGeneratedImages((prevImages) => [newImage, ...prevImages]);
     } catch (err: any) {
@@ -665,7 +675,7 @@ const App: React.FC = () => {
     } finally {
       setIsLoadingImage(false);
     }
-  }, [generatedPrompt, selectedImageModel, selectedAspectRatio, characterReferenceImage, characterReferenceImageFileName, imageQuality, isGoogleBackedModel, isKieAi4oImageModel, isKieAiSeedream4Model, isKieAiFlux2ProModel, isKieAiMidjourneyModel, isKieAiZImageModel, isKieAiGrokImagineModel, isKieAiQwenModel, geminiApiKey, kieAiApiKey, canEditCurrentSelectedModel]); // RE-ADDED: Added all API key related dependencies and Qwen model
+  }, [generatedPrompt, selectedImageModel, selectedAspectRatio, characterReferenceImages, imageQuality, isGoogleBackedModel, isKieAi4oImageModel, isKieAiSeedream4Model, isKieAiFlux2ProModel, isKieAiMidjourneyModel, isKieAiZImageModel, isKieAiGrokImagineModel, isKieAiQwenModel, geminiApiKey, kieAiApiKey, canEditCurrentSelectedModel, availableImageModels]); // RE-ADDED: Added all API key related dependencies and Qwen model
 
   const handleEditImage = useCallback(async (originalImage: KieAiImageGenerationResponse, editPrompt: string, editingModelId: string) => {
     if (!editPrompt.trim()) {
@@ -731,7 +741,6 @@ const App: React.FC = () => {
         imageQuality, // Pass image quality to editing as well
         geminiApiKey, // Pass Gemini API key for Google models
         kieAiApiKey, // Pass Kie.ai API key if needed (e.g., for Flux Kontext editing)
-        // For imageToEdit, we don't have an original filename from upload, Kie.aiService will use a generic name
       );
       setGeneratedImages((prevImages) => [newImage, ...prevImages]);
       setIsModalOpen(false); // Close modal after successful edit
@@ -830,7 +839,7 @@ const App: React.FC = () => {
       !personalityTraits.trim() && !backstory.trim() &&
       !hasMeaningfulSelection(cameraGear) && // New check
       !hasMeaningfulSelection(filter) && // New check
-      !characterReferenceImage &&
+      characterReferenceImages.length === 0 && // CHANGED: check array length
       !mainTopic.trim() && // New check
       !subtitles.some(s => s.text.trim().length > 0)
     );
@@ -998,8 +1007,7 @@ const App: React.FC = () => {
               initialBackstory={backstory} // New prop
               initialCameraGear={cameraGear} // New prop
               initialFilter={filter} // New prop
-              initialCharacterReferenceImage={characterReferenceImage} // New prop
-              initialCharacterReferenceImageFileName={characterReferenceImageFileName} // New prop for file name
+              initialCharacterReferenceImages={characterReferenceImages} // CHANGED: Pass array
               onCharacterReferenceChange={handleCharacterReferenceChange} // Corrected prop name
               disabled={isOperationDisabled}
             />

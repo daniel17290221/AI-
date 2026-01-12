@@ -1,5 +1,5 @@
 import { GoogleGenAI, GenerateContentResponse, Part } from '@google/genai';
-import { KieAiImageGenerationResponse, KieAiImageModel } from '../types';
+import { KieAiImageGenerationResponse, KieAiImageModel, ReferenceImage } from '../types';
 
 /**
  * Generates a data URL for a simple SVG placeholder image indicating it's a mock.
@@ -255,7 +255,7 @@ async function call4oImageApi(
   size: string,
   nVariants: number = 1,
   isEnhance: boolean = false,
-  referenceImageUrls?: string[] | null, // NEW: Add referenceImageUrls for 4o Image
+  referenceImageUrls?: string[] | null, // CHANGED: Now expects array of URLs
   maxWaitTimeMs: number = 300000,
 ): Promise<string[]> {
   const baseUrl = 'https://api.kie.ai/api/v1/gpt4o-image';
@@ -273,7 +273,7 @@ async function call4oImageApi(
       size: size,
       nVariants: nVariants,
       isEnhance: isEnhance,
-      ...(referenceImageUrls && referenceImageUrls.length > 0 && {reference_images: referenceImageUrls}), // Pass reference images
+      ...(referenceImageUrls && referenceImageUrls.length > 0 && {reference_images: referenceImageUrls}), // Pass reference images array
     })
   });
 
@@ -352,7 +352,7 @@ async function callFluxKontextApi(
   aspectRatio: string,
   resolution: string, // e.g., '1K', '2K', '4K'
   imageUrlToEdit?: string | null, // For image editing
-  referenceImageUrls?: string[] | null, // For image-to-image generation
+  referenceImageUrls?: string[] | null, // CHANGED: Now expects array of URLs for I2I generation
   maxWaitTimeMs: number = 300000, // 5 minutes
 ): Promise<string[]> {
   const baseUrl = 'https://api.kie.ai/api/v1/flux/kontext';
@@ -374,7 +374,7 @@ async function callFluxKontextApi(
 
   if (imageUrlToEdit) {
     inputPayload.image_url = imageUrlToEdit; // For editing
-  } else if (referenceImageUrls && referenceImageUrls.length > 0) {
+  } else if (referenceImageUrls && referenceImageUrls.length > 0) { // CHANGED: check length
     inputPayload.reference_image_urls = referenceImageUrls; // For I2I generation
   }
 
@@ -688,12 +688,12 @@ export const KieAiService = {
     width: number = 512, // These width/height are mostly for mock images now.
     height: number = 512, // Real APIs use aspectRatio + resolution.
     aspectRatio: string = '1:1',
-    characterReferenceImage?: { data: string; mimeType: string; } | null,
+    characterReferenceImages?: ReferenceImage[] | null, // CHANGED: now array of ReferenceImage
     imageToEdit?: { data: string; mimeType: string; } | null,
     imageQuality: string = '1K (표준)',
     geminiApiKey: string | null = null, // Re-added geminiApiKey
     kieAiApiKey: string | null = null, // Re-added kieAiApiKey
-    characterReferenceImageFileName?: string | null, // Added for passing to uploadImageToKieAi
+    // REMOVED characterReferenceImageFileName as it's now part of ReferenceImage
   ): Promise<KieAiImageGenerationResponse> => {
     
     console.log(`[Kie.ai Service] generateImage called for model: ${modelId}, prompt: "${textPrompt.substring(0, 50)}..."`);
@@ -724,9 +724,15 @@ export const KieAiService = {
         throw new Error("선택된 모델은 Kie.ai API 키가 필요합니다.");
       }
 
+      // Fix: Instantiate GoogleGenAI client once if a Google-backed model is selected.
+      // This ensures 'ai' is accessible for both Gemini and Imagen models.
+      let ai: GoogleGenAI | null = null;
+      if (modelId.startsWith('kie-gemini') || modelId.startsWith('kie-imagen')) {
+        ai = new GoogleGenAI({ apiKey: geminiApiKey! });
+      }
 
       // Prepare reference image URLs if any
-      let uploadedReferenceImageUrl: string | null = null;
+      let uploadedReferenceImageUrls: string[] = []; // CHANGED to array
       let uploadedImageToEditUrl: string | null = null;
 
       // Prioritize imageToEdit if it exists, for explicit editing scenarios
@@ -734,16 +740,19 @@ export const KieAiService = {
         console.log('[Kie.aiService] Uploading image to edit...');
         // For imageToEdit, we don't have the original filename readily, so use a generic one
         uploadedImageToEditUrl = await uploadImageToKieAi(kieAiApiKey!, imageToEdit.data, imageToEdit.mimeType, `edited_image.${imageToEdit.mimeType.split('/')[1] || 'png'}`);
-      } else if (characterReferenceImage) {
-        // If no explicit image to edit, check for character reference image
-        console.log('[Kie.aiService] Uploading character reference image...');
-        uploadedReferenceImageUrl = await uploadImageToKieAi(kieAiApiKey!, characterReferenceImage.data, characterReferenceImage.mimeType, characterReferenceImageFileName || `reference_image.${characterReferenceImage.mimeType.split('/')[1] || 'png'}`);
+      } else if (characterReferenceImages && characterReferenceImages.length > 0) { // CHANGED: check array
+        // If no explicit image to edit, check for character reference images
+        console.log(`[Kie.aiService] Uploading ${characterReferenceImages.length} character reference image(s)...`);
+        for (const refImage of characterReferenceImages) {
+          const uploadedUrl = await uploadImageToKieAi(kieAiApiKey!, refImage.data, refImage.mimeType, refImage.fileName);
+          uploadedReferenceImageUrls.push(uploadedUrl);
+        }
       }
 
 
       // Handle Seedream 4.0 (now 4.5)
       if (modelId === 'kie-seedream-4') {
-        if (characterReferenceImage || imageToEdit) {
+        if (characterReferenceImages && characterReferenceImages.length > 0 || imageToEdit) { // CHANGED: check array
           throw new Error("Seedream 4.5은 현재 텍스트-투-이미지만 지원합니다. 레퍼런스 이미지 또는 편집 기능은 사용할 수 없습니다.");
         }
 
@@ -774,7 +783,7 @@ export const KieAiService = {
 
       // Handle Midjourney (Kie.ai) - NEW
       if (modelId === 'kie-midjourney') {
-        if (characterReferenceImage || imageToEdit) {
+        if (characterReferenceImages && characterReferenceImages.length > 0 || imageToEdit) { // CHANGED: check array
           throw new Error("Midjourney (Kie.ai)는 현재 텍스트-투-이미지만 지원합니다. 레퍼런스 이미지 또는 편집 기능은 사용할 수 없습니다.");
         }
 
@@ -792,7 +801,7 @@ export const KieAiService = {
 
       // NEW: Handle Z-Image (Kie.ai)
       if (modelId === 'kie-z-image') {
-        if (characterReferenceImage || imageToEdit) {
+        if (characterReferenceImages && characterReferenceImages.length > 0 || imageToEdit) { // CHANGED: check array
           throw new Error("Z-Image (Kie.ai)는 현재 텍스트-투-이미지만 지원합니다. 레퍼런스 이미지 또는 편집 기능은 사용할 수 없습니다.");
         }
         
@@ -820,7 +829,7 @@ export const KieAiService = {
 
       // NEW: Handle Grok Imagine (Kie.ai) - CORRECTED to use aspect_ratio and map it
       if (modelId === 'kie-grok-imagine') {
-        if (characterReferenceImage || imageToEdit) {
+        if (characterReferenceImages && characterReferenceImages.length > 0 || imageToEdit) { // CHANGED: check array
           throw new Error("Grok Imagine (Kie.ai)는 현재 텍스트-투-이미지만 지원합니다. 레퍼런스 이미지 또는 편집 기능은 사용할 수 없습니다.");
         }
         
@@ -851,7 +860,7 @@ export const KieAiService = {
       // UPDATED: Handle Qwen AI (Kie.ai) as T2I
       if (modelId === 'kie-qwen') {
         // --- T2I VALIDATION FOR QWEN ---
-        if (characterReferenceImage || imageToEdit) {
+        if (characterReferenceImages && characterReferenceImages.length > 0 || imageToEdit) { // CHANGED: check array
           throw new Error("Qwen AI 모델은 현재 텍스트-투-이미지만 지원합니다. 레퍼런스 이미지 또는 편집 기능은 사용할 수 없습니다.");
         }
         // --- END T2I VALIDATION ---
@@ -900,12 +909,12 @@ export const KieAiService = {
           resolution: fluxResolution,
         };
 
-        const imageInputUrl = uploadedImageToEditUrl || uploadedReferenceImageUrl;
+        const imageInputUrls = uploadedImageToEditUrl ? [uploadedImageToEditUrl] : uploadedReferenceImageUrls; // If editing, use single imageToEdit URL, else all reference image URLs
 
-        if (imageInputUrl) {
+        if (imageInputUrls && imageInputUrls.length > 0) {
           modelToUseForJobApi = 'flux-2/pro-image-to-image'; // I2I model name
-          inputPayload.input_urls = [imageInputUrl]; // Pass as an array for I2I
-          console.log('[Kie.aiService] Flux-2 Pro I2I with prompt:', textPrompt, 'and image URL:', imageInputUrl);
+          inputPayload.input_urls = imageInputUrls; // Pass as an array for I2I
+          console.log('[Kie.aiService] Flux-2 Pro I2I with prompt:', textPrompt, 'and image URL(s):', imageInputUrls);
         } else {
           modelToUseForJobApi = 'flux-2/pro-text-to-image'; // T2I model name
           console.log('[Kie.aiService] Flux-2 Pro T2I with text prompt:', textPrompt);
@@ -927,21 +936,21 @@ export const KieAiService = {
 
       // Handle Gemini models
       if (modelId === 'kie-gemini-flash-image' || modelId === 'kie-gemini-pro-image') {
-        const ai = new GoogleGenAI({ apiKey: geminiApiKey! });
         const contentsParts: Part[] = [];
 
-        if (imageToEdit) { // Existing image editing logic
+        if (imageToEdit) { // Existing image editing logic (single image)
           contentsParts.push({ inlineData: { data: imageToEdit.data, mimeType: imageToEdit.mimeType } });
           contentsParts.push({ text: textPrompt });
           console.log('[Kie.aiService] Gemini editing image with prompt:', textPrompt);
-        } else { // New generation (with or without reference image)
-          if (characterReferenceImage) {
-            contentsParts.push({ inlineData: { data: characterReferenceImage.data, mimeType: characterReferenceImage.mimeType } });
-            console.log('[Kie.aiService] Gemini generating with character reference image and prompt:', textPrompt);
-          } else {
-            console.log('[Kie.aiService] Gemini generating with text prompt:', textPrompt);
+        } else if (characterReferenceImages && characterReferenceImages.length > 0) { // CHANGED: New generation with multiple reference images
+          for (const refImage of characterReferenceImages) {
+            contentsParts.push({ inlineData: { data: refImage.data, mimeType: refImage.mimeType } });
           }
           contentsParts.push({ text: textPrompt });
+          console.log(`[Kie.aiService] Gemini generating with ${characterReferenceImages.length} character reference image(s) and prompt:`, textPrompt);
+        } else { // New generation with text only
+          contentsParts.push({ text: textPrompt });
+          console.log('[Kie.aiService] Gemini generating with text prompt:', textPrompt);
         }
 
         const modelToUse = modelId === 'kie-gemini-flash-image' ? 'gemini-2.5-flash-image' : 'gemini-3-pro-image-preview';
@@ -949,10 +958,10 @@ export const KieAiService = {
 
         if (modelToUse === 'gemini-3-pro-image-preview') {
           config.imageConfig.imageSize = imageQuality.includes('2K') ? '2K' : (imageQuality.includes('4K') ? '4K' : '1K');
-          config.tools = [{googleSearch: {}}]; // Add googleSearch tool for relevant models as per guidelines
+          // config.tools = [{googleSearch: {}}]; // Temporarily removed to prevent conflicts with imageConfig in some versions or for image generation models where it might not be relevant. Re-add if explicitly needed and stable.
         }
 
-        const response: GenerateContentResponse = await ai.models.generateContent({
+        const response: GenerateContentResponse = await ai!.models.generateContent({
           model: modelToUse,
           contents: { parts: contentsParts },
           config: config,
@@ -973,9 +982,10 @@ export const KieAiService = {
 
       // Handle Imagen 4.0
       if (modelId === 'kie-imagen-4') {
-        const ai = new GoogleGenAI({ apiKey: geminiApiKey! });
+        // Imagen 4.0 typically supports one primary image for I2I, so we'll use the first reference image if multiple are provided.
+        // The check and alert for multiple images are now handled in App.tsx
         const imagenImagePayload = imageToEdit ? { imageBytes: imageToEdit.data, mimeType: imageToEdit.mimeType } : 
-                                   (characterReferenceImage ? { imageBytes: characterReferenceImage.data, mimeType: characterReferenceImage.mimeType } : undefined);
+                                   (characterReferenceImages && characterReferenceImages.length > 0 ? { imageBytes: characterReferenceImages[0].data, mimeType: characterReferenceImages[0].mimeType } : undefined);
 
         const config: any = {
           numberOfImages: 1,
@@ -985,7 +995,7 @@ export const KieAiService = {
         };
         
         console.log('[Kie.aiService] Imagen 4.0 generating with prompt:', textPrompt, 'and payload:', imagenImagePayload);
-        const response = await ai.models.generateImages({
+        const response = await ai!.models.generateImages({
           model: 'imagen-4.0-generate-001',
           prompt: textPrompt,
           image: imagenImagePayload,
@@ -1009,9 +1019,9 @@ export const KieAiService = {
         if (aspectRatio === '16:9' || aspectRatio === '4:3' || aspectRatio === '21:9') apiSize = '3:2';
         else if (aspectRatio === '9:16' || aspectRatio === '3:4' || aspectRatio === '16:21') apiSize = '2:3';
 
-        console.log('[Kie.aiService] 4o Image API generating with prompt:', textPrompt, 'and size:', apiSize, 'referenceImageUrls:', [uploadedReferenceImageUrl].filter(Boolean) as string[]);
-        // 4o Image uses 'reference_images' (array) which is fine for single uploaded ref image.
-        const resultUrls = await call4oImageApi(kieAiApiKey!, textPrompt, apiSize, 1, false, [uploadedReferenceImageUrl].filter(Boolean) as string[]);
+        console.log('[Kie.aiService] 4o Image API generating with prompt:', textPrompt, 'and size:', apiSize, 'referenceImageUrls:', uploadedReferenceImageUrls);
+        // 4o Image uses 'reference_images' (array) which is fine for single or multiple uploaded ref images.
+        const resultUrls = await call4oImageApi(kieAiApiKey!, textPrompt, apiSize, 1, false, uploadedReferenceImageUrls); // CHANGED: pass array
         return {
           imageUrl: resultUrls[0],
           model: modelId,

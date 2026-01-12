@@ -4,6 +4,7 @@ import TextInput from './TextInput';
 import { DropdownOption } from './Dropdown'; // Reusing DropdownOption type
 import CollapsibleSection from './CollapsibleSection'; // Import new CollapsibleSection component
 import Button from './Button'; // Import Button for clear functionality
+import { ReferenceImage } from '../types'; // Import ReferenceImage
 
 // Utility function to convert a File object to a base64 Data URL
 const fileToBase64 = (file: File): Promise<{ data: string; mimeType: string }> => {
@@ -70,9 +71,8 @@ interface PromptBuilderProps {
   initialBackstory?: string; // New
   initialCameraGear?: string[]; // New
   initialFilter?: string[]; // New
-  initialCharacterReferenceImage?: { data: string; mimeType: string; } | null; // New
-  initialCharacterReferenceImageFileName?: string | null; // New prop for file name
-  onCharacterReferenceChange: (image: { data: string; mimeType: string; } | null, fileName: string | null) => void; // New param for file name
+  initialCharacterReferenceImages?: ReferenceImage[]; // CHANGED: now array of ReferenceImage
+  onCharacterReferenceChange: (images: ReferenceImage[]) => void; // CHANGED: now handles array
   disabled: boolean;
 }
 
@@ -310,9 +310,8 @@ const PromptBuilder: React.FC<PromptBuilderProps> = ({
   initialBackstory = '', // New
   initialCameraGear = ['선택 안함'], // New
   initialFilter = ['선택 안함'], // New
-  initialCharacterReferenceImage = null, // New
-  initialCharacterReferenceImageFileName = null, // New prop for file name
-  onCharacterReferenceChange, // New param for file name
+  initialCharacterReferenceImages = [], // CHANGED: now array of ReferenceImage
+  onCharacterReferenceChange, // CHANGED: now handles array
   disabled,
 }) => {
   const [category, setCategory] = useState(initialCategory);
@@ -338,7 +337,8 @@ const PromptBuilder: React.FC<PromptBuilderProps> = ({
   const [backstory, setBackstory] = useState(initialBackstory); // New
   const [cameraGear, setCameraGear] = useState(initialCameraGear); // New
   const [filter, setFilter] = useState(initialFilter); // New
-  const [selectedFileName, setSelectedFileName] = useState(initialCharacterReferenceImageFileName); // New state for file name
+  // CHANGED: selectedReferenceImages is now a state directly managing the array of ReferenceImage objects
+  const [selectedReferenceImages, setSelectedReferenceImages] = useState<ReferenceImage[]>(initialCharacterReferenceImages);
 
   useEffect(() => {
     onStructuredPromptChange({
@@ -389,34 +389,54 @@ const PromptBuilder: React.FC<PromptBuilderProps> = ({
     onStructuredPromptChange,
   ]);
 
+  // Sync internal selectedReferenceImages with external initialCharacterReferenceImages
   useEffect(() => {
-    setSelectedFileName(initialCharacterReferenceImageFileName);
-  }, [initialCharacterReferenceImageFileName]);
+    setSelectedReferenceImages(initialCharacterReferenceImages);
+  }, [initialCharacterReferenceImages]);
+
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const newImages: ReferenceImage[] = [];
+    const currentImagesCount = selectedReferenceImages.length;
+    const MAX_IMAGES = 3; // Limit to 3 images
+
+    for (let i = 0; i < files.length && (currentImagesCount + newImages.length) < MAX_IMAGES; i++) {
+      const file = files[i];
       try {
         const { data, mimeType } = await fileToBase64(file);
-        onCharacterReferenceChange({ data, mimeType }, file.name); // Pass file name
-        setSelectedFileName(file.name);
+        newImages.push({
+          id: `${Date.now()}-${file.name}-${Math.random()}`, // Unique ID
+          data,
+          mimeType,
+          fileName: file.name,
+        });
       } catch (error) {
-        console.error("파일을 Base64로 변환하는데 실패했습니다:", error);
-        alert("이미지 업로드에 실패했습니다. 유효한 이미지 파일을 선택해주세요.");
-        onCharacterReferenceChange(null, null); // Clear any partial state
-        setSelectedFileName(null);
+        console.error("파일을 Base64로 변환하는데 실패했습니다:", file.name, error);
+        alert(`이미지 업로드에 실패했습니다: ${file.name}. 유효한 이미지 파일을 선택해주세요.`);
       }
-    } else {
-      onCharacterReferenceChange(null, null);
-      setSelectedFileName(null);
     }
+
+    if (newImages.length > 0) {
+      const updatedImages = [...selectedReferenceImages, ...newImages];
+      setSelectedReferenceImages(updatedImages);
+      onCharacterReferenceChange(updatedImages); // Notify parent with updated array
+    }
+
+    if (currentImagesCount + newImages.length >= MAX_IMAGES && files.length > (MAX_IMAGES - currentImagesCount)) {
+      alert(`최대 ${MAX_IMAGES}개의 참조 이미지만 추가할 수 있습니다. 추가 이미지는 무시됩니다.`);
+    }
+
     // Reset the input value to allow re-uploading the same file if needed
     event.target.value = '';
   };
 
-  const handleRemoveImage = () => {
-    onCharacterReferenceChange(null, null);
-    setSelectedFileName(null);
+  const handleRemoveImage = (idToRemove: string) => {
+    const updatedImages = selectedReferenceImages.filter(img => img.id !== idToRemove);
+    setSelectedReferenceImages(updatedImages);
+    onCharacterReferenceChange(updatedImages); // Notify parent
   };
 
   return (
@@ -541,39 +561,49 @@ const PromptBuilder: React.FC<PromptBuilderProps> = ({
       <CollapsibleSection title="인물 및 이미지 레퍼런스 (선택 사항)" initialOpen={false}>
         <div className="mb-4">
           <label htmlFor="characterImageUpload" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            레퍼런스 이미지 업로드:
+            레퍼런스 이미지 업로드 (최대 3개):
           </label>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+            Ctrl(또는 Cmd) 키를 누른 채 여러 파일을 선택하여 최대 3개까지 업로드할 수 있습니다.
+          </p>
           <div className="flex items-center space-x-2">
             <label
               htmlFor="characterImageUpload"
               className={`cursor-pointer inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm 
-                         ${disabled ? 'bg-gray-300 text-gray-600' : 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800'}`}
+                         ${disabled || selectedReferenceImages.length >= 3 ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800'}`}
+              aria-disabled={disabled || selectedReferenceImages.length >= 3}
             >
-              Choose File
+              Choose File(s)
               <input
                 type="file"
                 id="characterImageUpload"
                 accept="image/*"
                 onChange={handleImageUpload}
-                disabled={disabled}
+                disabled={disabled || selectedReferenceImages.length >= 3}
+                multiple // Allow multiple file selection
                 className="sr-only" // Hide the actual input
               />
             </label>
             <span className="text-gray-500 dark:text-gray-400 text-sm">
-              {selectedFileName || 'No file chosen'}
+              {selectedReferenceImages.length > 0 ? `${selectedReferenceImages.length}개 파일 선택됨` : '선택된 파일 없음'}
             </span>
           </div>
 
-          {initialCharacterReferenceImage && (
-            <div className="mt-4 flex flex-col items-center space-y-2">
-              <img
-                src={`data:${initialCharacterReferenceImage.mimeType};base64,${initialCharacterReferenceImage.data}`}
-                alt="캐릭터 레퍼런스 미리보기"
-                className="max-w-48 max-h-48 object-contain rounded-md border border-gray-300 dark:border-gray-600"
-              />
-              <Button onClick={handleRemoveImage} variant="secondary" size="sm" disabled={disabled}>
-                이미지 제거
-              </Button>
+          {selectedReferenceImages.length > 0 && (
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {selectedReferenceImages.map((img) => (
+                <div key={img.id} className="relative border border-gray-300 dark:border-gray-600 rounded-md p-2 flex flex-col items-center">
+                  <img
+                    src={`data:${img.mimeType};base64,${img.data}`}
+                    alt={img.fileName}
+                    className="max-w-full h-auto max-h-32 object-contain rounded-md mb-2"
+                  />
+                  <p className="text-xs text-gray-600 dark:text-gray-300 truncate w-full text-center mb-1">{img.fileName}</p>
+                  <Button onClick={() => handleRemoveImage(img.id)} variant="secondary" size="sm" disabled={disabled}>
+                    제거
+                  </Button>
+                </div>
+              ))}
             </div>
           )}
         </div>
