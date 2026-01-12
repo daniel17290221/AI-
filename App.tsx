@@ -601,7 +601,7 @@ const App: React.FC = () => {
         return; // Stop generation if unsupported model
       } else if (selectedImageModel === 'kie-gemini-flash-image') {
         // Only a suggestion, not an error or forced switch
-        setError('인물 및 이미지 레퍼런스 기능은 \'나노바나나 프로\' 모델에서 가장 만족스러운 결과를 제공합니다.');
+        alert('ℹ️ 인물 및 이미지 레퍼런스 기능은 \'나노바나나 프로\' 모델에서 가장 만족스러운 결과를 제공합니다. 현재 선택된 모델로 계속 진행합니다.');
       }
       modelToUse = selectedImageModel; // Use the selected model if it's in the allowed list
     }
