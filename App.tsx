@@ -953,7 +953,7 @@ const App: React.FC = () => {
 
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col items-center p-4 sm:p-6 lg:p-8 transition-colors duration-200">
+    <div className="bg-gray-50 dark:bg-gray-900 flex flex-col items-center p-4 sm:p-6 lg:p-8 transition-colors duration-200">
       <div className="w-full max-w-6xl flex justify-between items-center mb-6">
         <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 dark:text-gray-50 text-center flex-grow">
           AI 이미지 프롬프트 및 생성기
