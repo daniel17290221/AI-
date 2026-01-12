@@ -1070,7 +1070,7 @@ const App: React.FC = () => {
                   <img
                     src={generatedImages[0].imageUrl}
                     alt="프리뷰"
-                    className="max-w-[350px] max-h-[350px] object-contain rounded-md shadow-md border border-gray-300 dark:border-gray-600"
+                    className="w-auto h-auto max-w-full max-h-[400px] object-contain rounded-md shadow-md border border-gray-300 dark:border-gray-600"
                   />
                 </div>
               ) : generatedPrompt ? (
