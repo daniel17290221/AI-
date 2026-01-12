@@ -953,7 +953,7 @@ const App: React.FC = () => {
 
 
   return (
-    <div className="bg-gray-50 dark:bg-gray-900 flex flex-col items-center p-4 sm:p-6 lg:p-8 transition-colors duration-200 h-full">
+    <div className="bg-gray-50 dark:bg-gray-900 flex flex-col items-center p-4 sm:p-6 lg:p-8 transition-colors duration-200">
       <div className="w-full max-w-6xl flex justify-between items-center mb-6">
         <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 dark:text-gray-50 text-center flex-grow">
           AI 이미지 프롬프트 및 생성기
@@ -970,7 +970,7 @@ const App: React.FC = () => {
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-1">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.17.992c.381.22.755.474 1.12.753l.97-.242c.563-.141 1.166.183 1.341.713l.867 2.1c.176.53.029 1.15-.384 1.488l-.744.591a7.71 7.71 0 010 1.96l.744.591c.413.339.56 1.008.384 1.488l-.867 2.1c-.175.53-.778.854-1.341-.713l-.97-.242c-.365.279-.739.533-1.12-.753l-.17.992c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.17-.992c-.381-.22-.755-.474-1.12-.753l-.97.242c-.563.141-1.166-.183-1.341-.713l-.867-2.1c-.176-.53-.029-1.15.384-1.488l.744-.591a7.71 7.71 0 010-1.96l-.744-.591c-.413-.339-.56-1.008-.384-1.488l.867-2.1c.175-.53.778-.854 1.341-.713l.97.242c.365-.279.739-.533 1.12-.753l.17-.992z" />
-              <path strokeLinecap="round" strokeLineJoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
             API 키 설정/변경
           </Button>
