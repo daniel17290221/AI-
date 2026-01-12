@@ -983,7 +983,7 @@ const App: React.FC = () => {
           1. 이미지 프롬프트 및 이미지 생성
         </h2>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start flex-grow"> {/* Added flex-grow */}
-          <div className="lg:col-span-1 overflow-y-auto pr-2 custom-scrollbar"> {/* Removed max-h, keep overflow-y-auto */}
+          <div className="lg:col-span-1"> {/* Removed overflow-y-auto pr-2 custom-scrollbar */}
             <PromptBuilder
               onStructuredPromptChange={handleStructuredPromptChange}
               initialCategory={category} initialStyle={style} initialCharacter={character}
@@ -1005,7 +1005,7 @@ const App: React.FC = () => {
             />
           </div>
 
-          <div className="lg:col-span-1 flex flex-col space-y-6 overflow-y-auto pr-2 custom-scrollbar"> {/* Removed max-h, keep overflow-y-auto */}
+          <div className="lg:col-span-1 flex flex-col space-y-6"> {/* Removed overflow-y-auto pr-2 custom-scrollbar */}
             <div>
               <Button
                 onClick={handleGeneratePrompt}
@@ -1177,6 +1177,7 @@ const App: React.FC = () => {
           <LoadingSpinner />
           <p className="mt-2 text-gray-600 dark:text-gray-400">
             프롬프트 생성 중...
+
           </p>
         </div>
       )}
