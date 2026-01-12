@@ -983,7 +983,7 @@ const App: React.FC = () => {
           1. 이미지 프롬프트 및 이미지 생성
         </h2>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start flex-grow"> {/* Added flex-grow */}
-          <div className="lg:col-span-1 max-h-[calc(100vh-200px)] overflow-y-auto pr-2 custom-scrollbar"> {/* Added max-h and overflow-y-auto */}
+          <div className="lg:col-span-1 overflow-y-auto pr-2 custom-scrollbar"> {/* Removed max-h, keep overflow-y-auto */}
             <PromptBuilder
               onStructuredPromptChange={handleStructuredPromptChange}
               initialCategory={category} initialStyle={style} initialCharacter={character}
@@ -1005,7 +1005,7 @@ const App: React.FC = () => {
             />
           </div>
 
-          <div className="lg:col-span-1 flex flex-col space-y-6 max-h-[calc(100vh-200px)] overflow-y-auto pr-2 custom-scrollbar"> {/* Added max-h and overflow-y-auto */}
+          <div className="lg:col-span-1 flex flex-col space-y-6 overflow-y-auto pr-2 custom-scrollbar"> {/* Removed max-h, keep overflow-y-auto */}
             <div>
               <Button
                 onClick={handleGeneratePrompt}
